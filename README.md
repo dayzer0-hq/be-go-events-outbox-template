@@ -58,6 +58,39 @@ Four decisions worth knowing rather than discovering:
 
 `DATABASE_URL`, `REDIS_ADDR` and `ADDR` override the defaults.
 
+## The harnesses
+
+Your brief's "What's provided" names some of these. **They are test tools and fake external
+services, not your project** — none of them implements anything a ticket asks you to build.
+
+| command | belongs to | what it does |
+|---|---|---|
+| `cmd/chaos` | Blinkit order event pipeline | kills the publisher mid-transaction, redelivers events, delivers them out of order, and `-check` runs the consistency check across the order table and the stream |
+| `cmd/psp` | Juspay payment orchestration | four provider stubs with configurable latency, failure rate, timeout — and **charged-but-silent** — plus a status API you query afterwards |
+| `cmd/scenarios` | Juspay payment orchestration | named situations: `healthy`, `flaky-provider`, `provider-down`, `charged-but-silent`, `slow-then-recovered` |
+| `cmd/fleet` | Ather telemetry ingest | N virtual scooters with offline buffering, a synchronised reconnection surge, and malformed frames — including **a device whose clock is wrong** |
+| `cmd/verify` | Ather telemetry ingest | reads stored telemetry and checks no frame is stored twice, no device has a sequence gap, and nothing impossible was stored |
+
+Every one takes `-help`:
+
+```bash
+go run ./cmd/psp -help
+go run ./cmd/scenarios -list
+```
+
+⚠️ **`cmd/psp -charged-but-silent` is the mode the Juspay brief is about.** The money moves and the
+caller never hears. Your orchestrator cannot tell it from a plain timeout *at the time* — the only
+difference is what the status API says afterwards, which is the reconciliation the ticket asks for.
+
+⚠️ **A harness reports; it does not judge.** `cmd/chaos -check` knowing that every committed order
+must have exactly one event tells you nothing about how to guarantee it — an outbox table, a
+transactional publish, a dedupe key or a consumer-side ledger are all still open to you.
+
+`cmd/scenarios` deliberately does **not** start `cmd/psp` for you: you should be able to watch the
+provider's log in another terminal while the scenario runs.
+
+Several briefs share this repository, so you will see harnesses belonging to other projects.
+
 ## What is NOT here
 
 **Your brief's seeded data is not in this template, and neither is any harness it names** — the chaos harness, the replay tool, the PSP or provider stubs, the fleet simulator, the verifier.
